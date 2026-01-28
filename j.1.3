@@ -1,0 +1,368 @@
+#!/usr/bin/env python3
+"""
+JARVIS v1.3
+Simple AI assistant for macOS - Controls volume and brightness via text commands - soonb to be more
+"""
+
+import tkinter as tk
+from tkinter import scrolledtext
+import subprocess
+import re
+
+class JARVIS:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("JARVIS")
+        self.root.geometry("700x600")
+        self.root.configure(bg='#0a0a0a')
+        
+        # Main container with padding
+        main_frame = tk.Frame(root, bg='#0a0a0a')
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        # Title with arc reactor style
+        title_frame = tk.Frame(main_frame, bg='#0a0a0a')
+        title_frame.pack(pady=(0, 20))
+        
+        title = tk.Label(
+            title_frame, 
+            text="J.A.R.V.I.S.", 
+            font=("SF Pro Display", 32, "bold"),
+            fg="#00e5ff",
+            bg="#0a0a0a"
+        )
+        title.pack()
+        
+        subtitle = tk.Label(
+            title_frame,
+            text="Just A Rather Very Intelligent System",
+            font=("SF Pro Display", 10),
+            fg="#00e5ff",
+            bg="#0a0a0a"
+        )
+        subtitle.pack()
+        
+        # Chat display area with rounded effect
+        chat_frame = tk.Frame(main_frame, bg='#1a1a1a', highlightthickness=0)
+        chat_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
+        
+        self.chat_display = scrolledtext.ScrolledText(
+            chat_frame,
+            wrap=tk.WORD,
+            width=60,
+            height=18,
+            font=("SF Pro Text", 12),
+            bg="#1a1a1a",
+            fg="#ffffff",
+            insertbackground="#00e5ff",
+            relief=tk.FLAT,
+            padx=20,
+            pady=15,
+            borderwidth=0
+        )
+        self.chat_display.pack(fill=tk.BOTH, expand=True)
+        self.chat_display.config(state=tk.DISABLED)
+        
+        # Input frame with modern styling
+        input_frame = tk.Frame(main_frame, bg='#0a0a0a')
+        input_frame.pack(fill=tk.X)
+        
+        # Input container for rounded effect
+        input_container = tk.Frame(input_frame, bg='#1a1a1a', highlightthickness=0)
+        input_container.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
+        
+        # Input box
+        self.input_box = tk.Entry(
+            input_container,
+            font=("SF Pro Text", 13),
+            bg="#1a1a1a",
+            fg="#ffffff",
+            insertbackground="#00e5ff",
+            relief=tk.FLAT,
+            borderwidth=0
+        )
+        self.input_box.pack(fill=tk.X, ipady=12, padx=15, pady=2)
+        self.input_box.bind("<Return>", self.process_command)
+        
+        # Send button with glow effect
+        self.send_button = tk.Button(
+            input_frame,
+            text="→",
+            command=self.process_command,
+            font=("SF Pro Display", 18, "bold"),
+            bg="#00e5ff",
+            fg="#0a0a0a",
+            relief=tk.FLAT,
+            width=3,
+            height=1,
+            cursor="hand2",
+            borderwidth=0
+        )
+        self.send_button.pack(side=tk.RIGHT)
+        
+        # Welcome message
+        self.add_message("JARVIS: Hello! I'm online and ready to assist.", "jarvis")
+        
+        self.input_box.focus()
+    
+    def add_message(self, message, sender="user"):
+        """Add a message to the chat display"""
+        self.chat_display.config(state=tk.NORMAL)
+        
+        if sender == "user":
+            self.chat_display.insert(tk.END, "You: ", "user_label")
+            self.chat_display.insert(tk.END, f"{message}\n\n", "user_text")
+        else:
+            self.chat_display.insert(tk.END, f"{message}\n\n", "jarvis_text")
+        
+        # Configure tags for styling
+        self.chat_display.tag_config("user_label", foreground="#00e5ff", font=("SF Pro Text", 12, "bold"))
+        self.chat_display.tag_config("user_text", foreground="#e0e0e0")
+        self.chat_display.tag_config("jarvis_text", foreground="#00ff9d", font=("SF Pro Text", 12))
+        
+        self.chat_display.config(state=tk.DISABLED)
+        self.chat_display.see(tk.END)
+    
+    def process_command(self, event=None):
+        """Process user command"""
+        command = self.input_box.get().strip().lower()
+        
+        if not command:
+            return
+        
+        self.add_message(command, "user")
+        self.input_box.delete(0, tk.END)
+        
+        # Process the command
+        response = self.execute_command(command)
+        self.add_message(f"JARVIS: {response}", "jarvis")
+    
+    def execute_command(self, command):
+        """Execute the actual command and return response"""
+        
+        # Volume commands
+        if "volume" in command:
+            return self.handle_volume(command)
+        
+        # Brightness commands
+        elif "brightness" in command or "bright" in command:
+            return self.handle_brightness(command)
+        
+        # Mute/Unmute
+        elif "mute" in command:
+            return self.handle_mute(command)
+        
+        # Open app commands
+        elif "open" in command:
+            return self.handle_open_app(command)
+        
+        # Basic chat responses
+        else:
+            return self.handle_chat(command)
+    
+    def handle_volume(self, command):
+        """Handle volume control commands"""
+        try:
+            # Check for specific volume level
+            numbers = re.findall(r'\d+', command)
+            
+            if numbers:
+                volume = int(numbers[0])
+                if volume > 100:
+                    volume = 100
+                if volume < 0:
+                    volume = 0
+                
+                # Set volume on macOS
+                subprocess.run(['osascript', '-e', f'set volume output volume {volume}'], 
+                             check=True, capture_output=True)
+                return f"Volume set to {volume}%"
+            
+            # Volume up/down
+            elif "up" in command:
+                subprocess.run(['osascript', '-e', 'set volume output volume (output volume of (get volume settings) + 10)'],
+                             check=True, capture_output=True)
+                return "Volume increased"
+            
+            elif "down" in command:
+                subprocess.run(['osascript', '-e', 'set volume output volume (output volume of (get volume settings) - 10)'],
+                             check=True, capture_output=True)
+                return "Volume decreased"
+            
+            else:
+                return "Please specify a volume level (0-100) or say 'up' or 'down'"
+        
+        except Exception as e:
+            return f"Error adjusting volume: {str(e)}"
+    
+    def handle_brightness(self, command):
+        """Handle brightness control commands"""
+        try:
+            # Check for specific brightness level
+            numbers = re.findall(r'\d+', command)
+            
+            if numbers:
+                brightness = int(numbers[0])
+                if brightness > 100:
+                    brightness = 100
+                if brightness < 0:
+                    brightness = 0
+                
+                # Convert percentage to 0-1 scale
+                brightness_decimal = brightness / 100.0
+                
+                # Try using the brightness CLI tool
+                try:
+                    subprocess.run(['brightness', str(brightness_decimal)], 
+                                 check=True, capture_output=True, timeout=2)
+                    return f"Brightness set to {brightness}%"
+                except FileNotFoundError:
+                    return "To set specific brightness levels, install: brew install brightness\n(brightness up/down still work without it)"
+                except:
+                    return f"Brightness adjusted"
+            
+            # Brightness up/down - these should work without any tools
+            elif "up" in command:
+                # Press brightness up key multiple times
+                for _ in range(5):
+                    subprocess.run(['osascript', '-e', 
+                                  'tell application "System Events" to key code 144'],
+                                 capture_output=True)
+                return "Brightness increased"
+            
+            elif "down" in command:
+                # Press brightness down key multiple times
+                for _ in range(5):
+                    subprocess.run(['osascript', '-e', 
+                                  'tell application "System Events" to key code 145'],
+                                 capture_output=True)
+                return "Brightness decreased"
+            
+            else:
+                return "Please specify a brightness level (0-100) or say 'up' or 'down'"
+        
+        except Exception as e:
+            return "Brightness control in progress"
+    
+    def handle_mute(self, command):
+        """Handle mute/unmute commands"""
+        try:
+            if "unmute" in command:
+                subprocess.run(['osascript', '-e', 'set volume without output muted'],
+                             check=True, capture_output=True)
+                return "Unmuted"
+            else:
+                subprocess.run(['osascript', '-e', 'set volume with output muted'],
+                             check=True, capture_output=True)
+                return "Muted"
+        except Exception as e:
+            return f"Error: {str(e)}"
+    
+    def handle_open_app(self, command):
+        """Handle opening applications"""
+        try:
+            # Remove "open" from the command to get app name
+            app_name = command.replace("open", "").strip()
+            
+            # Common app mappings
+            app_mappings = {
+                "safari": "Safari",
+                "chrome": "Google Chrome",
+                "firefox": "Firefox",
+                "spotify": "Spotify",
+                "music": "Music",
+                "messages": "Messages",
+                "mail": "Mail",
+                "notes": "Notes",
+                "calendar": "Calendar",
+                "photos": "Photos",
+                "facetime": "FaceTime",
+                "finder": "Finder",
+                "terminal": "Terminal",
+                "vscode": "Visual Studio Code",
+                "code": "Visual Studio Code",
+                "slack": "Slack",
+                "discord": "Discord",
+                "zoom": "zoom.us",
+                "settings": "System Preferences",
+                "preferences": "System Preferences",
+                "calculator": "Calculator",
+                "maps": "Maps",
+            }
+            
+            # Get the proper app name
+            proper_name = app_mappings.get(app_name.lower(), app_name.title())
+            
+            # Open the application
+            subprocess.run(['open', '-a', proper_name], check=True, capture_output=True)
+            
+            return f"Opening {proper_name}"
+        
+        except subprocess.CalledProcessError:
+            return f"I couldn't find or open '{app_name}'. Make sure it's installed!"
+        except Exception as e:
+            return f"Error opening app: {str(e)}"
+    
+    def handle_chat(self, command):
+        """Handle basic chat/conversation"""
+        command_lower = command.lower()
+        
+        # Greetings
+        if any(word in command_lower for word in ["hello", "hi", "hey", "greetings"]):
+            return "Hello! How can I assist you today?"
+        
+        # How are you
+        elif any(phrase in command_lower for phrase in ["how are you", "how's it going", "what's up"]):
+            return "I'm functioning perfectly, thank you! All systems operational. How can I help you?"
+        
+        # Thank you
+        elif any(word in command_lower for word in ["thank", "thanks"]):
+            return "You're welcome! Happy to help."
+        
+        # What can you do
+        elif any(phrase in command_lower for phrase in ["what can you do", "your capabilities", "help me", "help"]):
+            return """Here's what I can do:
+• Volume: 'volume 50', 'volume up/down', 'mute/unmute'
+• Brightness: 'brightness 80', 'brightness up/down'
+• Open Apps: 'open safari', 'open spotify', 'open chrome'
+• Chat: Just talk to me normally!"""
+        
+        # Time
+        elif "time" in command_lower:
+            from datetime import datetime
+            current_time = datetime.now().strftime("%I:%M %p")
+            return f"The current time is {current_time}"
+        
+        # Date
+        elif "date" in command_lower:
+            from datetime import datetime
+            current_date = datetime.now().strftime("%B %d, %Y")
+            return f"Today is {current_date}"
+        
+        # Who are you
+        elif any(phrase in command_lower for phrase in ["who are you", "what are you"]):
+            return "I'm JARVIS, your personal AI assistant! I'm here to help control your Mac and answer your questions."
+        
+        # Goodbye
+        elif any(word in command_lower for word in ["goodbye", "bye", "see you", "exit"]):
+            return "Goodbye! I'll be here whenever you need me."
+        
+        # Default response
+        else:
+            responses = [
+                "I'm not sure how to respond to that yet, but I'm learning!",
+                "Interesting! I'm still developing my conversational abilities.",
+                "I understand. Is there something I can help you with?",
+                "That's noted. I can help with volume, brightness, or opening apps!",
+                "Hmm, I'm not quite sure about that. Try asking me to control volume, brightness, or open an app!"
+            ]
+            import random
+            return random.choice(responses)
+
+def main():
+    root = tk.Tk()
+    app = JARVIS(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
